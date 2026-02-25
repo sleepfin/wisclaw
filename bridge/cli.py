@@ -73,8 +73,8 @@ async def _check_ws_reachable(url: str) -> tuple[bool, str]:
     except websockets.exceptions.ConnectionClosedError:
         # Server closed after handshake (e.g. 4001) — address is reachable
         return True, ""
-    except websockets.exceptions.InvalidStatus:
-        # Server rejected upgrade but TCP is reachable — treat as reachable
+    except websockets.exceptions.InvalidHandshake:
+        # Server rejected upgrade (403, 401, etc.) but TCP is reachable
         return True, ""
     except ConnectionResetError:
         # Server reset the connection (e.g. no api_key) — still reachable
