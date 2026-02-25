@@ -76,6 +76,9 @@ async def _check_ws_reachable(url: str) -> tuple[bool, str]:
     except websockets.exceptions.InvalidStatus:
         # Server rejected upgrade but TCP is reachable — treat as reachable
         return True, ""
+    except ConnectionResetError:
+        # Server reset the connection (e.g. no api_key) — still reachable
+        return True, ""
     except (ConnectionRefusedError, OSError) as e:
         return False, f"Cannot connect to {url}: [{type(e).__name__}] {e}"
     except asyncio.TimeoutError:
