@@ -125,10 +125,14 @@ def _validate_cloud_url(url: str) -> tuple[bool, str]:
 
 
 def _validate_api_key(api_key: str, cloud_url: str) -> tuple[bool, str]:
-    """Validate API key format and verify against the cloud server."""
+    """Validate API key format. Connectivity check is skipped because the
+    server may reset connections before the WebSocket handshake completes,
+    making it impossible to distinguish valid from invalid keys."""
     if not api_key.startswith("evo_"):
         return False, "API key must start with 'evo_'"
-    return asyncio.run(_check_api_key(cloud_url, api_key))
+    if len(api_key) < 10:
+        return False, "API key is too short"
+    return True, ""
 
 
 def _validate_openclaw_url(url: str) -> tuple[bool, str]:
