@@ -4,6 +4,7 @@ import asyncio
 import json
 import logging
 import ssl
+import time
 
 import certifi
 import websockets
@@ -88,6 +89,9 @@ class BridgeClient:
 
     async def _handle_tool_request(self, ws, request_id: str, tool_name: str, arguments: dict):
         """Execute a tool request and send the response back."""
+        t_recv = time.time()
+        logger.info("[TIMING] tool_request RECEIVED id=%s tool=%s", request_id, tool_name)
+
         response = {
             "type": "tool_response",
             "request_id": request_id,
@@ -99,7 +103,10 @@ class BridgeClient:
         try:
             if tool_name == "local_openclaw":
                 query = arguments.get("query", "")
+                logger.info("[TIMING] OpenClaw query START id=%s", request_id)
                 result = await self.openclaw.aquery(query)
+                t_oclaw = time.time()
+                logger.info("[TIMING] OpenClaw query DONE id=%s (%.3fs)", request_id, t_oclaw - t_recv)
                 response["success"] = True
                 response["result"] = result
             else:
@@ -112,7 +119,8 @@ class BridgeClient:
             logger.error("Tool execution failed: %s", e, exc_info=True)
 
         await ws.send(json.dumps(response))
-        logger.info("Tool response sent: id=%s success=%s", request_id, response["success"])
+        t_sent = time.time()
+        logger.info("[TIMING] tool_response SENT id=%s success=%s (%.3fs total since recv)", request_id, response["success"], t_sent - t_recv)
 
     async def _send_status(self, ws):
         """Send status message after connecting."""

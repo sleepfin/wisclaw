@@ -32,11 +32,23 @@ class OpenClawLauncher:
         self._stderr_file = None
 
     def is_running(self) -> bool:
-        """Return True if OpenClaw HTTP server is reachable."""
+        """Return True if OpenClaw is reachable and healthy.
+
+        Checks /v1/models first (definitive proof OpenClaw API is up).
+        Falls back to root path accepting only 2xx — a 502 from a leftover
+        reverse-proxy or gateway shell does NOT count as "running".
+        """
+        try:
+            resp = httpx.get(
+                f"{self.url}/v1/models", timeout=3.0, follow_redirects=True,
+            )
+            if resp.status_code == 200:
+                return True
+        except Exception:
+            pass
         try:
             resp = httpx.get(self.url, timeout=3.0, follow_redirects=True)
-            # Any HTTP response means the server is up, regardless of status code.
-            return True
+            return 200 <= resp.status_code < 300
         except Exception:
             return False
 
@@ -55,13 +67,11 @@ class OpenClawLauncher:
             logger.error("openclaw executable not found on PATH")
             return False
 
-        port = self._parse_port()
-
-        logger.info("Starting openclaw gateway on port %s ...", port)
+        logger.info("Starting openclaw gateway run ...")
         try:
             self._stderr_file = open(_STDERR_LOG, "w", encoding="utf-8")
             self._process = subprocess.Popen(
-                [exe, "gateway", "--port", str(port)],
+                [exe, "gateway", "run"],
                 stdout=subprocess.DEVNULL,
                 stderr=self._stderr_file,
             )
