@@ -61,3 +61,30 @@ def save_config(cfg: dict) -> None:
 
 def get_config_path() -> str:
     return str(CONFIG_FILE)
+
+
+def detect_openclaw_config() -> dict:
+    """Auto-detect OpenClaw settings from its config file.
+
+    Reads ~/.openclaw/openclaw.json and extracts gateway port and auth token.
+    Returns dict with keys: url, token, port (any may be absent).
+    """
+    import json
+
+    config_path = Path.home() / ".openclaw" / "openclaw.json"
+    if not config_path.exists():
+        return {}
+    try:
+        data = json.loads(config_path.read_text(encoding="utf-8"))
+        result = {}
+        gateway = data.get("gateway", {})
+        port = gateway.get("port")
+        if port:
+            result["port"] = port
+            result["url"] = f"http://localhost:{port}"
+        token = gateway.get("auth", {}).get("token")
+        if token:
+            result["token"] = token
+        return result
+    except Exception:
+        return {}

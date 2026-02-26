@@ -32,13 +32,11 @@ class OpenClawLauncher:
         self._stderr_file = None
 
     def is_running(self) -> bool:
-        """Return True if OpenClaw responds to GET /v1/models."""
+        """Return True if OpenClaw HTTP server is reachable."""
         try:
-            resp = httpx.get(
-                f"{self.url}/v1/models",
-                timeout=3.0,
-            )
-            return resp.status_code == 200
+            resp = httpx.get(self.url, timeout=3.0, follow_redirects=True)
+            # Any HTTP response means the server is up, regardless of status code.
+            return True
         except Exception:
             return False
 
@@ -136,6 +134,17 @@ class OpenClawLauncher:
                 )
                 if stderr_output:
                     logger.error("openclaw stderr:\n%s", stderr_output)
+
+                # The process we launched failed, but OpenClaw may already be
+                # running (started externally).  Check reachability before
+                # giving up.
+                if self.is_running():
+                    logger.info(
+                        "OpenClaw is already running at %s (started externally)",
+                        self.url,
+                    )
+                    self._process = None
+                    return True
                 return False
 
             if self.is_running():

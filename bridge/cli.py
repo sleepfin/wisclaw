@@ -20,7 +20,7 @@ import httpx
 import websockets
 
 from bridge import __version__
-from bridge.config import load_config, save_config, get_config_path, _DEFAULTS
+from bridge.config import load_config, save_config, get_config_path, _DEFAULTS, detect_openclaw_config
 from bridge.client import BridgeClient
 from bridge.launcher import OpenClawLauncher
 from bridge.openclaw import OpenClawClient
@@ -209,8 +209,14 @@ def _run_config_wizard(force: bool = False) -> dict:
     )
     cfg = {**cfg, "api_key": api_key}
 
+    # --- Auto-detect OpenClaw settings from ~/.openclaw/openclaw.json ---
+    detected = detect_openclaw_config()
+
     # --- OpenClaw URL (format + health check, with skip option) ---
     default_openclaw = cfg.get("openclaw_url", _DEFAULTS["openclaw_url"])
+    if detected.get("url"):
+        default_openclaw = detected["url"]
+        print(f"  (Auto-detected OpenClaw at {default_openclaw})")
     print("  (Enter 'skip' to skip connectivity check if OpenClaw is not running yet)")
     while True:
         try:
@@ -221,7 +227,8 @@ def _run_config_wizard(force: bool = False) -> dict:
         if not raw:
             raw = default_openclaw
         if raw.lower() == "skip":
-            print(f"  Skipping connectivity check. Using: {cfg.get('openclaw_url', default_openclaw)}")
+            cfg = {**cfg, "openclaw_url": default_openclaw}
+            print(f"  Skipping connectivity check. Using: {default_openclaw}")
             break
         ok, err = _validate_openclaw_url(raw)
         if ok:
@@ -231,18 +238,23 @@ def _run_config_wizard(force: bool = False) -> dict:
         print("  Enter a valid URL or 'skip' to skip.\n")
 
     # --- OpenClaw Token (optional, no connectivity check) ---
-    token_display = "****" if cfg.get("openclaw_token") else "none"
-    try:
-        openclaw_token = input(
-            f"OpenClaw Token (empty to keep current, 'clear' to remove) [current: {token_display}]: "
-        ).strip()
-    except (KeyboardInterrupt, EOFError):
-        print("\nConfiguration cancelled.")
-        sys.exit(1)
-    if openclaw_token.lower() == "clear":
-        cfg = {**cfg, "openclaw_token": ""}
-    elif openclaw_token:
-        cfg = {**cfg, "openclaw_token": openclaw_token}
+    if not cfg.get("openclaw_token") and detected.get("token"):
+        detected_token = detected["token"]
+        print(f"  Auto-detected OpenClaw token: {detected_token[:8]}...")
+        cfg = {**cfg, "openclaw_token": detected_token}
+    else:
+        token_display = "****" if cfg.get("openclaw_token") else "none"
+        try:
+            openclaw_token = input(
+                f"OpenClaw Token (empty to keep current, 'clear' to remove) [current: {token_display}]: "
+            ).strip()
+        except (KeyboardInterrupt, EOFError):
+            print("\nConfiguration cancelled.")
+            sys.exit(1)
+        if openclaw_token.lower() == "clear":
+            cfg = {**cfg, "openclaw_token": ""}
+        elif openclaw_token:
+            cfg = {**cfg, "openclaw_token": openclaw_token}
 
     # --- OpenClaw Agent ID (has default, no connectivity check) ---
     default_agent = cfg.get("openclaw_agent_id", _DEFAULTS["openclaw_agent_id"])

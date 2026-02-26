@@ -36,7 +36,7 @@ class OpenClawClient:
         messages.append({"role": "user", "content": user_query})
 
         payload = {
-            "model": self.agent_id,
+            "model": f"openclaw:{self.agent_id}",
             "messages": messages,
         }
 
