@@ -11,7 +11,25 @@ permissions:
 
 jobs:
   build:
-    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            arch: x64
+            artifact: wizclaw-windows-x64.exe
+            binary: dist/wizclaw.exe
+          - os: macos-13
+            arch: x64
+            artifact: wizclaw-macos-x64
+            binary: dist/wizclaw
+          - os: macos-latest
+            arch: arm64
+            artifact: wizclaw-macos-arm64
+            binary: dist/wizclaw
+
+    runs-on: ${{ matrix.os }}
+
     steps:
       - uses: actions/checkout@v4
 
@@ -30,13 +48,14 @@ jobs:
 
       - name: Rename artifact
         run: |
-          Copy-Item dist/wizclaw.exe "dist/wizclaw-windows-x64.exe"
+          cp "${{ matrix.binary }}" "dist/${{ matrix.artifact }}"
+        shell: bash
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: wizclaw-windows-x64
-          path: dist/wizclaw-windows-x64.exe
+          name: ${{ matrix.artifact }}
+          path: dist/${{ matrix.artifact }}
 
   release:
     needs: build
@@ -51,5 +70,7 @@ jobs:
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
-          files: artifacts/wizclaw-windows-*.exe
+          files: |
+            artifacts/wizclaw-windows-*.exe
+            artifacts/wizclaw-macos-*
           generate_release_notes: true

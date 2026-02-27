@@ -2,6 +2,39 @@
 
 Bridge daemon，将本地 OpenClaw agent 连接到云端 WebSocket 服务。
 
+## macOS 安装
+
+### 一键安装（推荐）
+
+终端中执行：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/sleepfin/wizclaw/main/scripts/install-wizclaw.sh | bash
+```
+
+脚本会自动检测架构（Intel x64 / Apple Silicon arm64），下载对应的最新 release 到 `~/.local/bin` 并添加到 PATH。
+
+> **Gatekeeper 提示**：安装脚本已自动处理。如手动下载，需运行 `xattr -d com.apple.quarantine wizclaw` 解除隔离。
+
+### 手动安装
+
+1. 前往 [Releases](https://github.com/sleepfin/wizclaw/releases) 下载对应架构的文件：
+   - Apple Silicon (M1/M2/M3/M4): `wizclaw-macos-arm64`
+   - Intel Mac: `wizclaw-macos-x64`
+2. 重命名为 `wizclaw`，放到 PATH 中任意目录
+3. 赋予执行权限：`chmod +x wizclaw`
+4. 解除 Gatekeeper 隔离：`xattr -d com.apple.quarantine wizclaw`
+
+### 本地构建
+
+需要 Python 3.12+：
+
+```bash
+./scripts/build-wizclaw.sh
+```
+
+产物在 `dist/wizclaw-macos-arm64` 或 `dist/wizclaw-macos-x64`。
+
 ## Windows 安装
 
 ### 一键安装（推荐）
@@ -38,7 +71,7 @@ wizclaw config --force  # 强制覆盖已有配置
 wizclaw version      # 查看版本
 ```
 
-配置文件位置：`%APPDATA%\wizclaw\config.yaml`（Windows）或 `~/.wizclaw/config.yaml`（Linux/macOS）。
+配置文件位置：`%APPDATA%\wizclaw\config.yaml`（Windows）或 `~/.wizclaw/config.yaml`（macOS / Linux）。
 
 ## 发版流程
 
@@ -68,8 +101,10 @@ git push origin main --tags
 
 tag 必须以 `v` 开头（如 `v0.2.0`），推送后 GitHub Actions 会自动：
 
-1. 在 `windows-latest` runner 上用 PyInstaller 构建 `wizclaw.exe`
-2. 创建 GitHub Release，附带 `wizclaw-windows-x64.exe`
+1. 在 `windows-latest` runner 上构建 `wizclaw-windows-x64.exe`
+2. 在 `macos-13` runner (Intel) 上构建 `wizclaw-macos-x64`
+3. 在 `macos-latest` runner (Apple Silicon) 上构建 `wizclaw-macos-arm64`
+4. 创建 GitHub Release，附带所有平台的二进制文件
 
 ### 手动触发构建（不发 Release）
 
