@@ -68,8 +68,34 @@ class BridgeClient:
             logger.info("[STATE] Connected to cloud ✓")
             await self._send_status(ws)
 
-            async for raw in ws:
-                await self._handle_message(ws, raw)
+            # Run heartbeat and message listener concurrently.
+            # If either task exits (heartbeat failure or connection close),
+            # the other is cancelled and we fall through to reconnect.
+            listener = asyncio.create_task(self._listen(ws))
+            heartbeat = asyncio.create_task(self._heartbeat(ws))
+            try:
+                done, pending = await asyncio.wait(
+                    [listener, heartbeat], return_when=asyncio.FIRST_COMPLETED,
+                )
+                for task in pending:
+                    task.cancel()
+                # Re-raise any exception from the completed task
+                for task in done:
+                    task.result()
+            except asyncio.CancelledError:
+                pass
+
+    async def _listen(self, ws):
+        """Receive and dispatch messages from cloud."""
+        async for raw in ws:
+            await self._handle_message(ws, raw)
+
+    async def _heartbeat(self, ws):
+        """Send application-level ping every 25s to keep reverse proxy alive."""
+        while True:
+            await asyncio.sleep(25)
+            await ws.send(json.dumps({"type": "ping"}))
+            logger.debug("[HEARTBEAT] ping sent")
 
     async def _handle_message(self, ws, raw: str):
         try:
