@@ -33,21 +33,27 @@ class BridgeClient:
     async def run(self):
         """Main loop with exponential-backoff reconnection."""
         backoff = 1
+        attempt = 0
         while True:
+            attempt += 1
             try:
                 await self._connect_and_listen()
-                backoff = 1  # reset on clean disconnect
+                # Clean disconnect (server closed gracefully)
+                logger.warning("[STATE] Disconnected from cloud (clean close). Reconnecting in %ds...", backoff)
+                attempt = 0
+                backoff = 1
             except (
                 websockets.ConnectionClosedError,
                 websockets.InvalidStatusCode,
                 ConnectionRefusedError,
                 OSError,
             ) as e:
-                logger.warning("Connection lost: %s. Reconnecting in %ds...", e, backoff)
+                logger.warning("[STATE] Disconnected: %s. Retry #%d in %ds...", e, attempt, backoff)
             except Exception as e:
-                logger.error("Unexpected error: %s. Reconnecting in %ds...", e, backoff)
+                logger.error("[STATE] Unexpected error: %s. Retry #%d in %ds...", e, attempt, backoff)
 
             await asyncio.sleep(backoff)
+            logger.info("[STATE] Attempting reconnection #%d...", attempt)
             backoff = min(backoff * 2, self.reconnect_max)
 
     async def _connect_and_listen(self):
@@ -59,7 +65,7 @@ class BridgeClient:
             ssl_ctx = ssl.create_default_context(cafile=certifi.where())
 
         async with websockets.connect(url, ping_interval=30, ping_timeout=10, ssl=ssl_ctx) as ws:
-            logger.info("Connected to cloud")
+            logger.info("[STATE] Connected to cloud ✓")
             await self._send_status(ws)
 
             async for raw in ws:

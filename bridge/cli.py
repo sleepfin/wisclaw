@@ -40,12 +40,68 @@ def _setup_windows():
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 
+class _ColorFormatter(logging.Formatter):
+    """Logging formatter with ANSI colors, cross-platform."""
+
+    # ANSI escape codes
+    RESET = "\033[0m"
+    COLORS = {
+        logging.DEBUG:    "\033[36m",   # cyan
+        logging.INFO:     "\033[32m",   # green
+        logging.WARNING:  "\033[33m",   # yellow
+        logging.ERROR:    "\033[31m",   # red
+        logging.CRITICAL: "\033[1;31m", # bold red
+    }
+    DIM = "\033[2m"      # dim for timestamp/logger name
+    BOLD = "\033[1m"
+
+    def __init__(self, use_color=True):
+        super().__init__(datefmt="%Y-%m-%d %H:%M:%S")
+        self.use_color = use_color
+
+    def format(self, record):
+        if self.use_color:
+            color = self.COLORS.get(record.levelno, self.RESET)
+            ts = f"{self.DIM}{self.formatTime(record, self.datefmt)}{self.RESET}"
+            name = f"{self.DIM}{record.name}{self.RESET}"
+            level = f"{color}{self.BOLD}{record.levelname:<7}{self.RESET}"
+            msg = f"{color}{record.getMessage()}{self.RESET}"
+            return f"{ts} {name} {level} {msg}"
+        else:
+            record.message = record.getMessage()
+            return f"{self.formatTime(record, self.datefmt)} {record.name} {record.levelname}: {record.message}"
+
+
+def _enable_windows_ansi():
+    """Enable ANSI escape code support on Windows 10+."""
+    if sys.platform != "win32":
+        return True
+    try:
+        import ctypes
+        kernel32 = ctypes.windll.kernel32
+        # STD_OUTPUT_HANDLE = -11
+        handle = kernel32.GetStdHandle(-11)
+        # Get current mode
+        mode = ctypes.c_ulong()
+        kernel32.GetConsoleMode(handle, ctypes.byref(mode))
+        # ENABLE_VIRTUAL_TERMINAL_PROCESSING = 0x0004
+        kernel32.SetConsoleMode(handle, mode.value | 0x0004)
+        return True
+    except Exception:
+        return False
+
+
 def _setup_logging():
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
+    use_color = sys.stderr.isatty()
+    if use_color and sys.platform == "win32":
+        use_color = _enable_windows_ansi()
+
+    handler = logging.StreamHandler()
+    handler.setFormatter(_ColorFormatter(use_color=use_color))
+
+    root = logging.getLogger()
+    root.setLevel(logging.INFO)
+    root.addHandler(handler)
 
 
 # ---------------------------------------------------------------------------

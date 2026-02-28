@@ -31,7 +31,7 @@ _DEFAULTS = {
     "openclaw_token": "",
     "openclaw_agent_id": "main",
     "openclaw_auto_start": True,
-    "reconnect_interval_max": 30,
+    "reconnect_interval_max": 10,
     "request_timeout": 120,
 }
 
