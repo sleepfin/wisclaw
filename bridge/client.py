@@ -3,8 +3,10 @@
 import asyncio
 import json
 import logging
+import platform
 import ssl
 import time
+import uuid
 
 import certifi
 import websockets
@@ -161,6 +163,17 @@ class BridgeClient:
             "type": "status",
             "openclaw_status": "healthy" if openclaw_ok else "unreachable",
             "client_version": __version__,
+            "hostname": platform.node(),
+            "machine_id": self._get_machine_id(),
         }
         await ws.send(json.dumps(status))
-        logger.info("Status sent: openclaw=%s", status["openclaw_status"])
+        logger.info("Status sent: openclaw=%s hostname=%s", status["openclaw_status"], status["hostname"])
+
+    @staticmethod
+    def _get_machine_id() -> str:
+        """Return a stable machine identifier based on MAC address."""
+        try:
+            mac = uuid.getnode()
+            return format(mac, '012x')
+        except Exception:
+            return ""
